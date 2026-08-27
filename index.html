@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routh Systems: Controls for AI That Takes Actions</title>
+<meta name="description" content="Routh Systems helps companies put controls between an AI system and the business before it starts taking actions: least privilege, authorization at the action layer, guardrails, audit trail, and evaluation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Routh Systems.
+
+   Two references, one grammar: Italian cathedral marble (Siena,
+   Orvieto) and 1920s Art Deco. What they share is black and white
+   in real proportion, banded rather than sprinkled, and geometry
+   doing the ornament: squares, triangles, rays, inscribed circles.
+
+   So sections alternate ground. White stone, black stone, white
+   stone. Every colour is a token, and .inverse swaps the tokens,
+   which is why an inverted section needs no rules of its own.
+
+   No colour anywhere by intent.
+   ============================================================ */
+
+:root{
+  --sheet:      #fbfaf8;   /* white marble */
+  --ink:        #100e0c;   /* black marble */
+  --ink-soft:   #4a453e;
+  --ink-faint:  #7d7669;
+  --rule:       #c2bbae;
+  --rule-faint: #e2ddd3;
+
+  /* Cinzel is cut from Roman inscriptional capitals, which is the
+     cathedral half and, letterspaced, reads Deco as well. Jost is a
+     geometric sans in the Futura line: the Deco half, and the thing
+     that stops an all-serif page reading as an invitation. */
+  --display: "Cinzel", "Trajan Pro", Georgia, "Times New Roman", serif;
+  --geom:    "Jost", "Futura", "Century Gothic", system-ui, sans-serif;
+  --body:    "EB Garamond", Garamond, "Iowan Old Style", "Times New Roman", serif;
+
+  /* Wide enough that it only binds on a very large display. With the root
+     size below, 110rem is about 2280px. */
+  --page-w: 110rem;
+
+  /* Edges are deliberately tight. The page is meant to fill the glass. */
+  --gutter: clamp(0.85rem, 1.6vw, 1.6rem);
+  --rail: 15rem;
+}
+
+/* The page is set to read as it did at 130% browser zoom, which is where it
+   looked right. Everything on the page is in rem, so raising the root size is
+   the whole change: rem lengths grow by 130% and vw lengths do not, which is
+   exactly what a browser does when you zoom. Tune this one number to resize
+   the entire page. Expressed as a percentage rather than px so a reader who
+   has set a larger default font in their browser still gets it. */
+html{ font-size: 130%; }
+
+/* Black stone. Swapping the tokens inverts every component below. */
+.inverse{
+  --sheet:      #100e0c;
+  --ink:        #fbfaf8;
+  --ink-soft:   #c8c1b5;
+  --ink-faint:  #8d8579;
+  --rule:       #4b453c;
+  --rule-faint: #2a2620;
+  background: var(--sheet);
+  color: var(--ink);
+}
+
+*{ box-sizing: border-box; }
+
+html{ -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce){ html{ scroll-behavior: auto; } }
+
+body{
+  margin: 0;
+  background: var(--sheet);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: clamp(1.02rem, 0.98rem + 0.22vw, 1.16rem);
+  line-height: 1.68;
+  font-feature-settings: "kern" 1, "liga" 1, "onum" 1;
+  text-rendering: optimizeLegibility;
+}
+
+/* Stone grain. Barely there, and it sits under both grounds. */
+body::before{
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  opacity: .22; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23g)' opacity='0.3'/></svg>");
+}
+
+main, header, footer{ position: relative; z-index: 1; }
+
+.wrap{ max-width: var(--page-w); margin: 0 auto; padding-inline: var(--gutter); }
+
+section{ padding-block: clamp(3.4rem, 6vw, 6.5rem); background: var(--sheet); color: var(--ink); }
+
+/* Where two courses of the same stone meet, a rule marks the joint. Where
+   the stone changes, the change is the joint and no rule is wanted. */
+section:not(.inverse) + section:not(.inverse){ border-top: 1px solid var(--rule); }
+
+/* ---------- type ---------- */
+
+h1, h2, h3, h4{ font-family: var(--display); font-weight: 500; margin: 0; text-wrap: balance; }
+
+h1{
+  font-size: clamp(2rem, 0.7rem + 4.3vw, 5rem);
+  line-height: 1.08;
+  letter-spacing: 0.005em;
+  font-weight: 600;
+  text-transform: uppercase;
+  max-width: 20ch;
+}
+h2{
+  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.2rem);
+  line-height: 1.18;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+h3{
+  font-size: 1.12rem; line-height: 1.3; font-weight: 600;
+  letter-spacing: 0.045em; text-transform: uppercase;
+}
+
+p{ margin: 0 0 1.1em; }
+p:last-child{ margin-bottom: 0; }
+strong{ font-weight: 600; }
+
+a{ color: inherit; text-decoration: none; }
+
+a.xref{
+  border-bottom: 1px solid var(--rule);
+  transition: border-color .25s ease, color .25s ease;
+}
+a.xref:hover, a.xref:focus-visible{ border-bottom-color: var(--ink); color: var(--ink); }
+
+/* The one calligraphic note left, and it is set against black bands and
+   hard geometry so it reads as an accent rather than as lace. */
+.script{ font-family: var(--body); font-style: italic; font-weight: 500; text-transform: none; }
+
+.lede{
+  font-size: clamp(1.1rem, 1.01rem + 0.42vw, 1.32rem);
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+/* Geometric sans, wide-tracked. Every label, rank and control on the page. */
+.label{
+  display: block;
+  font-family: var(--geom);
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .3em;
+  font-weight: 500;
+  color: var(--ink-faint);
+  margin: 0 0 .9rem;
+}
+
+.nums{ font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "lnum" 1, "tnum" 1; }
+
+/* ---------- geometric ornament ---------- */
+
+/* Marble inlay: a checkered course, the floor of every Tuscan duomo. */
+.band{
+  height: 14px;
+  background-color: var(--sheet);
+  background-image:
+    linear-gradient(45deg, var(--ink) 25%, transparent 25% 75%, var(--ink) 75%),
+    linear-gradient(45deg, var(--ink) 25%, transparent 25% 75%, var(--ink) 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 7px 7px;
+}
+
+svg.deco{ display: block; width: 100%; height: auto; color: var(--ink); }
+
+/* ---------- masthead: black stone ---------- */
+
+.masthead{ position: sticky; top: 0; z-index: 30; border-bottom: 1px solid var(--ink); }
+.masthead .wrap{
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem; flex-wrap: wrap; padding-block: .95rem;
+}
+.wordmark{
+  font-family: var(--display); font-size: 1rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .3em; white-space: nowrap;
+}
+.masthead nav{ display: flex; gap: clamp(1rem, 2vw, 2.2rem); align-items: center; flex-wrap: wrap; }
+.masthead nav a{
+  font-family: var(--geom);
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .2em; font-weight: 500;
+  color: var(--ink-soft);
+  padding-bottom: 3px; border-bottom: 2px solid transparent;
+  transition: color .25s ease, border-color .25s ease;
+}
+.masthead nav a:hover, .masthead nav a:focus-visible{ color: var(--ink); border-bottom-color: var(--ink); }
+@media (max-width: 46rem){
+  .masthead{ position: static; }
+  .masthead nav{ display: none; }
+}
+
+/* ---------- title block ---------- */
+
+.titleblock{ padding-top: clamp(2.6rem, 5vw, 4.5rem); }
+
+.statement-line{
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1.5rem;
+  border-top: 4px solid var(--ink); border-bottom: 1px solid var(--ink);
+  padding-block: .75rem; margin-bottom: clamp(2.4rem, 5vw, 3.6rem);
+  font-family: var(--geom);
+  font-size: .66rem; text-transform: uppercase; letter-spacing: .28em; font-weight: 500;
+  color: var(--ink-faint);
+}
+.statement-line :last-child{ text-align: right; }
+@media (max-width: 46rem){
+  .statement-line{ grid-template-columns: 1fr; text-align: center; gap: .3rem; }
+  .statement-line :last-child{ text-align: center; }
+}
+
+.hero-body{
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: end;
+  margin-top: clamp(2.2rem, 4vw, 3.4rem);
+}
+@media (max-width: 62rem){ .hero-body{ grid-template-columns: 1fr; align-items: start; } }
+.hero-body .lede{ max-width: 54ch; }
+
+.hero-aside{ display: flex; flex-direction: column; gap: 1.8rem; align-items: flex-start; }
+.hero-aside .deco-holder{ width: clamp(7rem, 11vw, 10rem); align-self: flex-end; }
+@media (max-width: 62rem){ .hero-aside .deco-holder{ display: none; } }
+
+.cta-row{ display: flex; gap: 1.4rem; align-items: center; flex-wrap: wrap; }
+
+/* ---------- controls: solid black, no outline ---------- */
+
+.btn{
+  display: inline-block; font-family: var(--geom);
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .2em; font-weight: 500;
+  padding: .95rem 2rem;
+  border: 2px solid var(--ink);
+  background: var(--ink); color: var(--sheet);
+  cursor: pointer;
+  transition: background-color .25s ease, color .25s ease;
+}
+.btn:hover, .btn:focus-visible{ background: transparent; color: var(--ink); }
+.btn-quiet{
+  background: transparent; color: var(--ink-soft);
+  border: 0; border-bottom: 2px solid var(--rule);
+  padding: .95rem 0;
+}
+.btn-quiet:hover, .btn-quiet:focus-visible{ background: transparent; color: var(--ink); border-bottom-color: var(--ink); }
+
+/* ---------- railed section ---------- */
+
+.railed{ display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); gap: clamp(1.6rem, 3.5vw, 4rem); align-items: start; }
+@media (max-width: 68rem){ .railed{ grid-template-columns: 1fr; gap: 1.4rem; } }
+.rail{ position: sticky; top: 5rem; }
+@media (max-width: 68rem){ .rail{ position: static; } }
+.rail p{ font-size: .88rem; color: var(--ink-faint); margin-top: 1rem; line-height: 1.6; }
+
+.measure{ max-width: 68ch; }
+
+/* ---------- the controls table ---------- */
+
+.controls{ width: 100%; border-collapse: collapse; margin-top: 2.2rem; }
+.controls caption{
+  caption-side: top; text-align: left; padding-bottom: 1rem;
+  font-family: var(--geom);
+  font-size: .66rem; text-transform: uppercase; letter-spacing: .26em; font-weight: 500; color: var(--ink-faint);
+}
+/* The header is a black course laid across the table. */
+.controls thead th{
+  font-family: var(--geom); font-weight: 500; text-align: left; vertical-align: bottom;
+  font-size: .62rem; text-transform: uppercase; letter-spacing: .16em; line-height: 1.5;
+  background: var(--ink); color: var(--sheet);
+  padding: .85rem .9rem;
+}
+.controls thead th:first-child{ padding-left: 1rem; }
+.controls thead th:last-child{ padding-right: 1rem; }
+.controls tbody tr{ border-bottom: 1px solid var(--rule); }
+.controls tbody tr:last-child{ border-bottom: 4px solid var(--ink); }
+.controls td, .controls th[scope="row"]{ padding: 1.5rem .9rem; vertical-align: top; text-align: left; font-size: .93rem; line-height: 1.6; }
+.controls th[scope="row"]{ padding-left: 1rem; width: 20%; font-weight: 400; font-family: var(--body); }
+.controls td:last-child{ padding-right: 1rem; }
+.controls .step{
+  display: inline-block; font-family: var(--geom); font-size: .6rem; letter-spacing: .22em;
+  text-transform: uppercase; font-weight: 500;
+  background: var(--ink); color: var(--sheet);
+  padding: .2rem .5rem; margin-bottom: .6rem;
+}
+.controls th[scope="row"] .name{ font-family: var(--display); font-size: 1.02rem; display: block; line-height: 1.3; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.controls td{ color: var(--ink-soft); }
+.controls td.limit{ color: var(--ink); }
+
+@media (max-width: 64rem){
+  .controls, .controls tbody, .controls tr, .controls td, .controls th{ display: block; width: auto; }
+  .controls thead{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .controls tbody tr{ padding-block: 1.7rem; }
+  .controls th[scope="row"]{ padding: 0 0 .9rem; width: auto; border-bottom: 1px solid var(--rule); }
+  .controls td{ padding: .9rem 0 0; }
+  .controls td::before{
+    content: attr(data-l); display: block;
+    font-family: var(--geom); font-size: .58rem; letter-spacing: .2em;
+    text-transform: uppercase; font-weight: 500; color: var(--ink-faint); margin-bottom: .3rem;
+  }
+}
+
+.tabnote{ margin-top: 1.4rem; font-size: .85rem; line-height: 1.6; color: var(--ink-faint); max-width: 72ch; }
+.tabnote strong{ color: var(--ink-soft); font-weight: 600; }
+
+/* ---------- engagements ---------- */
+
+.engagements{ margin-top: 2.2rem; border-top: 4px solid var(--ink); }
+.engagement{
+  display: grid;
+  grid-template-columns: 3.6rem minmax(0, 1fr) minmax(0, 15rem);
+  gap: 0 clamp(1.2rem, 2.6vw, 3rem);
+  padding-block: 2.2rem; border-bottom: 1px solid var(--rule); align-items: start;
+}
+.engagement:last-child{ border-bottom: 4px solid var(--ink); }
+/* Roman numeral set in a filled square: the Deco plaque. */
+.engagement .roman{
+  font-family: var(--display); font-size: .95rem; font-weight: 700; letter-spacing: .04em;
+  background: var(--ink); color: var(--sheet);
+  width: 2.4rem; height: 2.4rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.engagement h3{ margin-bottom: .55rem; }
+.engagement p{ color: var(--ink-soft); max-width: 60ch; }
+.terms{ margin: 0; font-family: var(--geom); font-size: .78rem; line-height: 1.7; color: var(--ink-soft); border-left: 2px solid var(--rule); padding-left: 1.2rem; }
+.terms dt{ font-size: .6rem; text-transform: uppercase; letter-spacing: .2em; font-weight: 500; color: var(--ink-faint); }
+.terms dd{ margin: 0 0 .7rem; }
+.terms dd:last-child{ margin-bottom: 0; }
+@media (max-width: 70rem){
+  .engagement{ grid-template-columns: 3.2rem 1fr; }
+  .terms{ grid-column: 2; border-left: 0; padding-left: 0; margin-top: 1.2rem; padding-top: 1rem;
+          border-top: 1px solid var(--rule);
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0 1.5rem; }
+}
+@media (max-width: 40rem){
+  .engagement{ grid-template-columns: 1fr; }
+  .engagement .roman{ margin-bottom: .8rem; }
+  .terms{ grid-column: 1; }
+}
+
+/* ---------- practice ---------- */
+
+.practice-grid{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); gap: clamp(2rem, 4vw, 4rem); align-items: start; }
+@media (max-width: 62rem){ .practice-grid{ grid-template-columns: 1fr; } }
+
+.commitments{ border: 2px solid var(--ink); padding: 1.5rem 1.6rem; font-family: var(--geom); }
+.commitments dt{ font-size: .6rem; text-transform: uppercase; letter-spacing: .2em; font-weight: 500; color: var(--ink-faint); margin-top: 1.1rem; }
+.commitments dt:first-of-type{ margin-top: 0; }
+.commitments dd{ margin: .2rem 0 0; font-size: .82rem; line-height: 1.6; color: var(--ink-soft); }
+
+/* ---------- appointment ---------- */
+
+.appointment-grid{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 26rem); gap: clamp(2rem, 5vw, 5rem); align-items: start; }
+@media (max-width: 62rem){ .appointment-grid{ grid-template-columns: 1fr; } }
+
+.booking{ border: 2px solid var(--ink); padding: clamp(1.5rem, 2.5vw, 2.1rem); }
+.booking .label{ text-align: center; margin-bottom: 1.4rem; }
+.booking dl{ margin: 0; display: grid; grid-template-columns: auto 1fr; gap: .55rem 1.3rem; align-items: baseline; font-family: var(--geom); font-size: .82rem; }
+.booking dt{ font-size: .6rem; text-transform: uppercase; letter-spacing: .2em; font-weight: 500; color: var(--ink-faint); white-space: nowrap; }
+.booking dd{ margin: 0; }
+.booking dd a{ border-bottom: 1px solid var(--rule); word-break: break-word; transition: border-color .25s ease; }
+.booking dd a:hover, .booking dd a:focus-visible{ border-bottom-color: var(--ink); }
+.booking .btn{ display: block; text-align: center; margin-top: 1.7rem; }
+.booking .fineprint{ margin-top: 1.3rem; font-size: .8rem; color: var(--ink-faint); line-height: 1.55; }
+@media (max-width: 30rem){
+  .booking dl{ grid-template-columns: 1fr; gap: .1rem; }
+  .booking dd{ margin-bottom: .8rem; }
+}
+
+/* ---------- colophon ---------- */
+
+.colophon .wrap{
+  display: flex; justify-content: space-between; gap: 1.2rem; flex-wrap: wrap;
+  padding-block: 2rem 2.4rem;
+  font-family: var(--geom);
+  font-size: .64rem; text-transform: uppercase; letter-spacing: .22em; font-weight: 500; color: var(--ink-faint);
+}
+.colophon a:hover{ color: var(--ink); }
+
+/* ---------- entrance ---------- */
+
+.reveal{ opacity: 0; transform: translateY(12px); }
+.reveal.seen{ opacity: 1; transform: none; transition: opacity .9s cubic-bezier(.2,.6,.2,1), transform .9s cubic-bezier(.2,.6,.2,1); }
+@media (prefers-reduced-motion: reduce){ .reveal, .reveal.seen{ opacity: 1; transform: none; transition: none; } }
+
+:focus-visible{ outline: 3px solid var(--ink); outline-offset: 3px; }
+
+/* ---------- print: every stone goes white ---------- */
+
+@media print{
+  body{ background: #fff; }
+  body::before{ display: none; }
+  .inverse{
+    --sheet: #fff; --ink: #000; --ink-soft: #333; --ink-faint: #555;
+    --rule: #999; --rule-faint: #ccc;
+    background: #fff; color: #000;
+  }
+  .masthead{ position: static; }
+  .rail{ position: static; }
+  .masthead nav, .cta-row, .booking .btn, .deco-holder, .band{ display: none; }
+  .controls thead th{ background: #fff; color: #000; border-top: 3px solid #000; border-bottom: 1px solid #000; }
+  .controls .step, .engagement .roman{ background: #fff; color: #000; border: 1px solid #000; }
+  .btn{ background: #fff; color: #000; }
+  section{ padding-block: 1.4rem; break-inside: avoid; }
+  .reveal{ opacity: 1; transform: none; }
+  .controls tbody tr{ break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead inverse">
+  <div class="wrap">
+    <a class="wordmark" href="#top">Routh&nbsp;Systems</a>
+    <nav aria-label="Sections">
+      <a href="#controls">The controls</a>
+      <a href="#engagements">Engagements</a>
+      <a href="#practice">Practice</a>
+      <a href="#appointment">Appointment</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= TITLE BLOCK ================= -->
+  <section class="titleblock" id="top">
+    <div class="wrap">
+
+      <div class="statement-line reveal">
+        <span>Routh Systems &#183; Colorado</span>
+        <span>Controls for AI that takes actions</span>
+        <span class="nums">Established 2026</span>
+      </div>
+
+      <h1 class="reveal">Your AI is about to start <span class="script">acting.</span> Put the controls in first.</h1>
+
+      <div class="hero-body">
+        <div class="reveal">
+          <p class="lede">
+            An assistant that answers questions over your own documents is read-only
+            and mostly safe. When that same assistant can issue a refund, change a
+            configuration, or move data, ordinary IT controls are not enough. We help
+            you choose the right controls, install them, and show that they work.
+          </p>
+        </div>
+        <div class="hero-aside reveal">
+          <div class="cta-row">
+            <a class="btn" href="#appointment">Request a consultation</a>
+            <a class="btn btn-quiet" href="#controls">Start with the controls</a>
+          </div>
+          <div class="deco-holder"><svg class="deco" viewBox="0 0 200 200" aria-hidden="true"></svg></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= THE CONTROLS ================= -->
+  <section id="controls">
+    <div class="wrap railed">
+      <div class="rail reveal">
+        <span class="label">Established practice</span>
+        <h2>The controls</h2>
+        <p>
+          Every control below is available today in mature tools, and most companies
+          already have some in place. The usual gap is knowing which controls to
+          implement first, and what each one covers.
+        </p>
+      </div>
+
+      <div class="reveal">
+        <table class="controls">
+          <caption>In the order worth implementing them</caption>
+          <thead>
+            <tr>
+              <th scope="col">Control</th>
+              <th scope="col">What it gives you</th>
+              <th scope="col">What it takes to put in</th>
+              <th scope="col">What it does not cover</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <tr>
+              <th scope="row">
+                <span class="step nums">First</span>
+                <span class="name">Least privilege and isolation</span>
+              </th>
+              <td data-l="What it gives you">
+                Bounds damage from any single mistake. Credentials are scoped to the
+                job, not the person. The agent never sees a tool it may not use.
+                Snapshot and restore sit behind anything that writes.
+              </td>
+              <td data-l="What it takes">
+                Distinct credentials per workflow and a read-only default. Days of work,
+                not quarters, and the cheapest control on this list.
+              </td>
+              <td data-l="What it does not cover" class="limit">
+                It bounds how bad a mistake is, not how likely. An agent operating
+                entirely inside its sandbox can still do the wrong thing with everything
+                you gave it.
+              </td>
+            </tr>
+
+            <tr>
+              <th scope="row">
+                <span class="step nums">Second</span>
+                <span class="name">Authorization at the action layer</span>
+              </th>
+              <td data-l="What it gives you">
+                A defensible decision for each action: this actor, this action, this
+                resource, allow or deny. AWS Cedar, Open Policy Agent, and the agent
+                gateways all answer this same question. Cedar goes furthest by
+                machine-checking properties of its own evaluator.
+              </td>
+              <td data-l="What it takes">
+                Explicit rules and an enforcement point every call must pass through.
+                The rules take the time.
+              </td>
+              <td data-l="What it does not cover" class="limit">
+                Per-action enforcement does not guarantee the result of a sequence of
+                actions. <a class="xref" href="#practice">See The practice</a>.
+              </td>
+            </tr>
+
+            <tr>
+              <th scope="row">
+                <span class="step nums">Third</span>
+                <span class="name">Guardrails and constrained output</span>
+              </th>
+              <td data-l="What it gives you">
+                Input and output filters, classifiers, model judges, and constrained
+                decoding. Constrained decoding gives a hard guarantee about output
+                <em>form</em>. Filters are best-effort guesses about <em>meaning</em>.
+              </td>
+              <td data-l="What it takes">
+                Little. Mostly configuration on tools you are already paying for, which
+                is why it is often the first thing bought.
+              </td>
+              <td data-l="What it does not cover" class="limit">
+                A syntactically perfect tool call that moves the wrong money passes every
+                content filter. It is useful and cheap, but it is a filter rather than
+                a boundary.
+              </td>
+            </tr>
+
+            <tr>
+              <th scope="row">
+                <span class="step nums">Fourth</span>
+                <span class="name">The audit trail</span>
+              </th>
+              <td data-l="What it gives you">
+                Six months later, even to a hostile reviewer, you can answer why the
+                system did what it did. Capture the action, the inputs it saw, the
+                decision and its reason, and a signed receipt per decision.
+              </td>
+              <td data-l="What it takes">
+                Deciding what to record <em>before</em> deployment. Retrofitting an audit
+                trail after an incident is the expensive version of this work.
+              </td>
+              <td data-l="What it does not cover" class="limit">
+                Monitoring detects. It does not prevent. A record that cannot
+                reconstruct a decision is logs, not an audit trail.
+              </td>
+            </tr>
+
+            <tr>
+              <th scope="row">
+                <span class="step nums">Fifth</span>
+                <span class="name">Evaluation, before and after</span>
+              </th>
+              <td data-l="What it gives you">
+                Early warning on failures you have already seen. Thirty real cases with
+                known answers, run on every change. Every incident becomes a permanent
+                test.
+              </td>
+              <td data-l="What it takes">
+                An afternoon to start, then discipline. A limited monitored rollout
+                before you widen.
+              </td>
+              <td data-l="What it does not cover" class="limit">
+                Necessary but insufficient. The failures that matter are the ones the
+                suite was not built to catch, a lesson the frontier labs have published
+                on their own systems.
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+
+        <p class="tabnote">
+          <strong>Before any of it.</strong> If you have already put an assistant over
+          your own documents, the permissions belong at retrieval, not at generation.
+          Index everything into one store and rely on the model to be discreet, and you
+          have built a polite interface that answers questions the asker was never
+          allowed to ask. Filter by the asking person's entitlements before anything
+          reaches the model. Know which documents your assistant can see. Most
+          organizations we ask cannot answer that.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ENGAGEMENTS ================= -->
+  <section id="engagements" class="inverse">
+    <div class="wrap railed">
+      <div class="rail reveal">
+        <span class="label">How we work</span>
+        <h2>Engagements</h2>
+        <p>
+          Most clients take these in order. The first needs no integration, no traffic,
+          and no change to anything you are running today.
+        </p>
+      </div>
+
+      <div class="reveal">
+        <div class="engagements">
+
+          <article class="engagement">
+            <div class="roman">I.</div>
+            <div>
+              <h3>Controls review</h3>
+              <p>
+                We inventory what your AI systems can already reach and what they will
+                be able to reach next quarter, then measure that against the five
+                controls above. You get a written report: what is in place, what is
+                assumed but not enforced, what is missing, and the order to close the
+                gaps, with cost estimates. The work uses only your policy documents and
+                tool schemas. No traffic and nothing in production.
+              </p>
+            </div>
+            <dl class="terms">
+              <dt>Duration</dt><dd>Two to three weeks</dd>
+              <dt>You provide</dt><dd>Policy documents, tool or API schemas, one workflow owner</dd>
+              <dt>Deliverable</dt><dd>Written review, prioritized remediation order, working session on the findings</dd>
+              <dt>Fee</dt><dd>On application</dd>
+            </dl>
+          </article>
+
+          <article class="engagement">
+            <div class="roman">II.</div>
+            <div>
+              <h3>Implementation</h3>
+              <p>
+                The review becomes working controls: scoped credentials and isolation;
+                rules written and enforced at the action layer on Cedar, Open Policy
+                Agent, or the gateway you already run; an audit trail that reconstructs
+                a decision; and an evaluation suite seeded with your real cases. Built
+                on tools you can staff and maintain after we leave. Model-agnostic,
+                because it governs the actions, not the model.
+              </p>
+            </div>
+            <dl class="terms">
+              <dt>Duration</dt><dd>Six to twelve weeks</dd>
+              <dt>Deliverable</dt><dd>Working controls in your environment, rule set, audit design, evaluation suite, handover</dd>
+              <dt>Fee</dt><dd>On application</dd>
+            </dl>
+          </article>
+
+          <article class="engagement">
+            <div class="roman">III.</div>
+            <div>
+              <h3>Advisory and vendor diligence</h3>
+              <p>
+                Retained, or by the day. We help you ask AI vendors the right questions
+                before deployment and assess what a product actually enforces compared
+                with what its marketing implies. Architecture review before an agent
+                program commits. Technical diligence for an investor looking at this
+                market. Expert input where a risk committee, auditor, or regulator needs
+                to understand what an AI deployment can and cannot be held to.
+              </p>
+            </div>
+            <dl class="terms">
+              <dt>Basis</dt><dd>Retainer or day rate</dd>
+              <dt>Deliverable</dt><dd>Written opinion, review memorandum, or standing counsel</dd>
+              <dt>Fee</dt><dd>On application</dd>
+            </dl>
+          </article>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PRACTICE ================= -->
+  <section id="practice">
+    <div class="wrap railed">
+      <div class="rail reveal">
+        <span class="label">How we work</span>
+        <h2>The practice</h2>
+      </div>
+
+      <div class="reveal">
+        <div class="practice-grid">
+          <div class="measure">
+            <p>
+              Routh Systems works at the seam where an AI decision becomes a real-world
+              action. The work is grounded in formal methods and program verification, a
+              discipline that predates large language models and has spent forty years
+              building tools for reasoning about what a system can and cannot be made
+              to do. We apply it to the specific problem of an agent holding
+              credentials. Some of the current research is our own. Whether each action
+              is permitted is one question. Whether the job can still be completed is
+              another, and it is the one we work on.
+            </p>
+            <p>
+              We are not a reseller. We keep agent safety and policy frameworks under
+              review across two dozen open-source and commercial products. When an
+              existing engine is right for your deployment, we recommend it. You are
+              buying judgment about which controls you need, in what order, and what
+              each will and will not do once it is in.
+            </p>
+            <p>
+              Configuring an authorization layer is straightforward. Establishing that
+              it has been configured <em>correctly</em> is the hard half: the rules as
+              written still allow the work to be finished across a whole sequence of
+              actions, not one action at a time. That is where Routh Systems is
+              uniquely equipped. We hold proprietary methods for answering that question
+              and the expertise to apply them to your workflow.
+            </p>
+          </div>
+
+          <dl class="commitments">
+            <dt>Independence</dt>
+            <dd>No reseller agreement or revenue share with any vendor we might recommend to you</dd>
+            <dt>Deliverables</dt>
+            <dd>Written and yours. Findings, rule sets, and audit design leave with you</dd>
+            <dt>Handover</dt>
+            <dd>Built on tools your own people can staff and maintain after we are gone</dd>
+            <dt>Candor</dt>
+            <dd>Every recommendation labeled by what stands behind it: measured, established practice, or judgment</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= APPOINTMENT ================= -->
+  <section id="appointment" class="inverse">
+    <div class="wrap railed">
+      <div class="rail reveal">
+        <span class="label">Next step</span>
+        <h2>Request an appointment</h2>
+      </div>
+
+      <div class="reveal">
+        <div class="appointment-grid">
+          <div class="measure">
+            <p class="lede">
+              Thirty minutes. No preparation required. Bring the AI system you are least
+              certain about, or the one someone is asking you to sign off on.
+            </p>
+            <p>
+              You will leave with the order to put controls in for that specific system
+              and a straight answer about which of them you already have. That is worth
+              having whether or not you engage us afterward, and it
+              is the fastest way to find out whether we are useful to you.
+            </p>
+          </div>
+
+          <div class="booking">
+            <span class="label">Terms of the first meeting</span>
+            <dl>
+              <dt>Duration</dt><dd>Thirty minutes, by video</dd>
+              <dt>Fee</dt><dd>None</dd>
+              <dt>In confidence</dt><dd>NDA on request, covering what you tell us</dd>
+              <dt>Direct</dt><dd><a href="mailto:william@routhsystems.com">william@routhsystems.com</a></dd>
+            </dl>
+            <a class="btn" id="booking-cta" href="mailto:william@routhsystems.com?subject=Routh%20Systems%20consultation%20request&amp;body=A%20sentence%20on%20the%20system%2C%20and%20two%20or%20three%20times%20that%20suit%20you.">Choose a time</a>
+            <p class="fineprint" id="booking-fineprint">
+              Opens our scheduler, which shows real availability. If you would rather
+              write, the address above reaches the same place.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="band" aria-hidden="true"></div>
+
+<footer class="colophon inverse">
+  <div class="wrap">
+    <span>Routh Systems &#183; Colorado</span>
+    <span><a href="mailto:william@routhsystems.com">william@routhsystems.com</a></span>
+    <span class="nums">2026</span>
+  </div>
+</footer>
+
+<script>
+/* ------------------------------------------------------------------
+   1. SCHEDULING.  ONE LINE TO SET: the booking URL below.  The button
+      opens it in a new tab; the scheduler holds the live calendar, so
+      the times offered there are real free slots.
+
+        Cal.com   ->  "https://cal.com/your-handle/consultation"
+        Calendly  ->  "https://calendly.com/your-handle/30min"
+
+      The calendar is deliberately NOT embedded in this page.  An iframe
+      of a third-party scheduler drags in their styling, sizes badly, and
+      fails silently wherever framing is blocked.  Sending the visitor to
+      the scheduler is the more robust arrangement and looks the same to
+      them.
+
+      Left empty, the page falls back to a mailto: request so it is never
+      broken.  See site/README.md, "Wiring up scheduling".
+   ------------------------------------------------------------------ */
+var BOOKING = {
+  link: "https://cal.com/william-scarbro/30min"
+};
+
+(function () {
+  var cta  = document.getElementById("booking-cta");
+  var fine = document.getElementById("booking-fineprint");
+
+  /* No scheduler configured: fall back to writing in. */
+  if (!BOOKING.link) {
+    cta.textContent = "Write to request a time";
+    fine.textContent =
+      "A sentence on the system, and two or three times that suit you, is enough.";
+    return;
+  }
+
+  cta.setAttribute("href", BOOKING.link);
+  cta.setAttribute("target", "_blank");
+  cta.setAttribute("rel", "noopener");
+})();
+
+/* ------------------------------------------------------------------
+   2. ORNAMENT.  A cosmatesque roundel, drawn rather than shipped as an
+      image: a checkered ring of alternating stone, an inscribed circle,
+      a square set on its point, and a solid centre.  The same geometry
+      is in every duomo floor in Tuscany and on every Deco lobby wall.
+   ------------------------------------------------------------------ */
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  var CX = 100, CY = 100;
+
+  function pt(r, deg) {
+    var a = (deg - 90) * Math.PI / 180;
+    return [CX + r * Math.cos(a), CY + r * Math.sin(a)];
+  }
+  function el(name, attrs) {
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) { n.setAttribute(k, attrs[k]); }
+    return n;
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("svg.deco"), function (svg) {
+    var g = el("g", { fill: "currentColor", stroke: "none" });
+
+    /* Checkered ring: sixteen segments, every other one cut in stone. */
+    var SEG = 16, R1 = 98, R2 = 74;
+    for (var i = 0; i < SEG; i += 2) {
+      var a0 = i * (360 / SEG), a1 = (i + 1) * (360 / SEG);
+      var p = [pt(R1, a0), pt(R1, a1), pt(R2, a1), pt(R2, a0)];
+      g.appendChild(el("polygon", {
+        points: p.map(function (q) { return q[0].toFixed(2) + "," + q[1].toFixed(2); }).join(" ")
+      }));
+    }
+
+    /* Inscribed circle, square on its point, and a solid centre. */
+    g.appendChild(el("circle", { cx: CX, cy: CY, r: 66, fill: "none", stroke: "currentColor", "stroke-width": 2 }));
+    var d = [pt(58, 0), pt(58, 90), pt(58, 180), pt(58, 270)];
+    g.appendChild(el("polygon", {
+      points: d.map(function (q) { return q[0].toFixed(2) + "," + q[1].toFixed(2); }).join(" "),
+      fill: "none", stroke: "currentColor", "stroke-width": 2
+    }));
+    g.appendChild(el("circle", { cx: CX, cy: CY, r: 40, fill: "none", stroke: "currentColor", "stroke-width": 1 }));
+    g.appendChild(el("rect", { x: CX - 15, y: CY - 15, width: 30, height: 30,
+                               transform: "rotate(45 " + CX + " " + CY + ")" }));
+
+    svg.appendChild(g);
+  });
+})();
+
+/* ------------------------------------------------------------------
+   3. ENTRANCE.  One quiet rise per block, once.
+   ------------------------------------------------------------------ */
+(function () {
+  var items = document.querySelectorAll(".reveal");
+  if (!("IntersectionObserver" in window) ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    Array.prototype.forEach.call(items, function (el) { el.classList.add("seen"); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry, i) {
+      if (!entry.isIntersecting) return;
+      var el = entry.target;
+      setTimeout(function () { el.classList.add("seen"); }, i * 80);
+      io.unobserve(el);
+    });
+  }, { rootMargin: "0px 0px -6% 0px", threshold: 0.05 });
+  Array.prototype.forEach.call(items, function (el) { io.observe(el); });
+})();
+</script>
+
+</body>
+</html>
